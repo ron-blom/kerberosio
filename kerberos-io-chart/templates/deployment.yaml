@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kerberos-io-chart.fullname" . }}
+  labels:
+    {{- include "kerberos-io-chart.labels" . | nindent 4 }}
+spec:
+{{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+{{- end }}
+  strategy:
+    type: Recreate      
+  selector:
+    matchLabels:
+      {{- include "kerberos-io-chart.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+    {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      labels:
+        {{- include "kerberos-io-chart.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "kerberos-io-chart.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          volumeMounts:
+            - name: kerberos-config
+              mountPath: /etc/opt/kerberosio/config
+            - name: kerberos-capture
+              mountPath: /etc/opt/kerberosio/capture
+            - name: kerberos-logs
+              mountPath: /etc/opt/kerberosio/logs
+            - name: kerberos-scripts
+              mountPath: /etc/opt/kerberosio/scripts
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+        - name: telegram-sidecar
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "blomron/telegram-sidecar:latest"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          volumeMounts:
+            - name: kerberos-capture
+              mountPath: /etc/opt/kerberosio/capture
+          ports:
+            - name: http
+              containerPort: 8090
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          env:
+            - name: BOT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: telegram
+                  key: bot_id
+            - name: TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: telegram
+                  key: token
+            - name: CHAT_IDS
+              valueFrom:
+                secretKeyRef:
+                  name: telegram
+                  key: chat_ids
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: kerberos-config
+          persistentVolumeClaim:
+            claimName: kerberos-config
+        - name: kerberos-capture
+          persistentVolumeClaim:
+            claimName: kerberos-capture
+        - name: kerberos-logs
+          persistentVolumeClaim:
+            claimName: kerberos-logs
+        - name: kerberos-scripts
+          persistentVolumeClaim:
+            claimName: kerberos-scripts
+  
