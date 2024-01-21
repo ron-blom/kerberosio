@@ -50,36 +50,6 @@ spec:
               protocol: TCP
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-        - name: telegram-sidecar
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "blomron/telegram-sidecar:latest"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          volumeMounts:
-            - name: kerberos-capture
-              mountPath: /etc/opt/kerberosio/capture
-          ports:
-            - name: http
-              containerPort: 8090
-              protocol: TCP
-          resources:
-            {{- toYaml .Values.resources | nindent 12 }}
-          env:
-            - name: BOT_ID
-              valueFrom:
-                secretKeyRef:
-                  name: telegram
-                  key: bot_id
-            - name: TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: telegram
-                  key: token
-            - name: CHAT_IDS
-              valueFrom:
-                secretKeyRef:
-                  name: telegram
-                  key: chat_ids
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
